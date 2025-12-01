@@ -3,14 +3,12 @@ import { GoogleGenAI } from "@google/genai";
 const outputSchema = {
   type: "object",
   properties: {
-    brand_jp: { type: "string" },
-    brand_en: { type: "string" },
-    productName_jp: { type: "string" },
-    productName_en: { type: "string" },
-    model_jp: { type: "string" },
-    model_en: { type: "string" },
+    shortTitle: { type: "string" },
+    productName: { type: "string" },
+    brand: { type: "string" },
+    model: { type: "string" },
   },
-  required: ["productName_jp", "productName_en"],
+  required: ["shortTitle", "productName"],
 };
 
 export const generateWithGemini = async (
