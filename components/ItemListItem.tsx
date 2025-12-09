@@ -124,7 +124,7 @@ const ItemListItem: React.FC<ItemListItemProps> = ({
 
             {/* Date and Location */}
             <p className="text-xs text-gray-600">
-              <span>{formattedDate}</span>
+              <span>{formattedDate}</span>  
               <span className="hidden md:inline">&nbsp;</span>
               <br className="md:hidden" />
               <span>{offer_info?.pref}で買取</span>

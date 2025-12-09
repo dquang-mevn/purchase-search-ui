@@ -1,24 +1,27 @@
 import { GoogleGenAI } from "@google/genai";
 
-const outputSchema = {
-  type: "object",
-  properties: {
-    shortTitle: { type: "string" },
-    productName: { type: "string" },
-    brand: { type: "string" },
-    model: { type: "string" },
-  },
-  required: ["shortTitle", "productName"],
+export const defaultOutputSchema = {
+  type: "object"
 };
 
 export const generateWithGemini = async (
   title: string,
   prompt: string,
   geminiApiKey: string,
-): Promise<Record<string, string>> => {
+  userCustomSchema: object,
+  requiredFields: string[]
+): Promise<Record<string, unknown>> => {
   const ai = new GoogleGenAI({
     apiKey: geminiApiKey,
   });
+  const outputSchema = {
+    ...defaultOutputSchema,
+    properties: {
+      ...userCustomSchema
+    },
+    required: requiredFields,
+  }
+  console.log({outputSchema})
   const config = {
     temperature: 0,
     thinkingConfig: {
