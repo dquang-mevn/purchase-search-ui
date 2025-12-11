@@ -34,9 +34,10 @@ const DEFAULT_PROMPT = `Role: Query Understanding
 Task: Extract Brand and Category
 Input: "%s"
 Rules:
-- brand: Raw brand as appears in the query. If the query clearly mentions a brand, you MUST output it. Product line/model names are NOT brands (e.g., AirPods, Galaxy S23). For such models, output the actual manufacturer brand instead when clear (AirPods -> Apple, Galaxy S23 -> Samsung); otherwise leave brand empty.
-- normalizedBrand: Brand name in UPPERCASE ENGLISH (e.g., 東芝->TOSHIBA, シャープ->SHARP, ナショナル->NATIONAL, AirPods->APPLE). If you output brand, you MUST output normalizedBrand. Only leave both empty when the query truly has no brand.
-- category: COARSE product type only (no variants/attributes). UPPERCASE ENGLISH CONSTANT, 1-2 tokens with underscore. Examples (short): COFFEE_MAKER, LAPTOP, SMARTPHONE, CAMERA, LENS. Do NOT add qualifiers like ESPRESSO/MULTI-FUNCTION/MANUAL. Always pick the base type only. Use the most common everyday term; avoid niche synonyms (e.g., prefer RECORD_PLAYER over TURNTABLE). If category is unclear/ambiguous, return an empty string "" (do NOT guess).`;
+- If unclear/ambiguous, return an empty string "" (do NOT guess!).
+- brand: Raw brand as appears in the query. If the query clearly mentions a brand, you MUST output it. Product line/model names are NOT brands (e.g., AirPods, Galaxy S23). For such models, output the actual manufacturer brand instead when clear (AirPods -> Apple, Galaxy S23 -> Samsung).
+- normalizedBrand: Brand name in UPPERCASE ENGLISH (e.g., 東芝->TOSHIBA, シャープ->SHARP, ナショナル->NATIONAL, アップル->APPLE). If you output brand, you MUST output normalizedBrand. Only leave both empty when the query truly has no brand.
+- category: COARSE product type only (no variants/attributes). UPPERCASE ENGLISH CONSTANT, 1-2 tokens with underscore. Examples (short): COFFEE_MAKER, LAPTOP, SMARTPHONE, CAMERA, LENS. Do NOT add qualifiers like ESPRESSO/MULTI-FUNCTION/MANUAL. Always pick the base type only. Use the most common everyday term; avoid niche synonyms (e.g., prefer RECORD_PLAYER over TURNTABLE).`;
 
 const OUTPUT_SCHEMA = {
   brand: { type: "string" },
