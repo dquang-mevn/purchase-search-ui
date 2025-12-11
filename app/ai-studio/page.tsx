@@ -6,7 +6,6 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   generateWithGemini,
 } from "@/lib/gemini-helpers";
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 const OUTPUT_SCHEMA_STORAGE_KEY = "ai-studio-output-schema";
@@ -33,10 +32,6 @@ export default function AiStudioPage() {
   const handleSetPrompt = (value: string) => {
     localStorage.setItem("ai-studio-prompt", value);
     setPrompt(value);
-  };
-  const handleSetGeminiApiKey = (value: string) => {
-    localStorage.setItem("ai-studio-gemini-api-key", value);
-    setGeminiApiKey(value);
   };
 
   const parsedSchema = useMemo(() => {
@@ -78,6 +73,8 @@ export default function AiStudioPage() {
 
   useEffect(() => {
     const cachedPrompt = localStorage.getItem("ai-studio-prompt");
+    const cachedGeminiApiKey = localStorage.getItem("ai-studio-gemini-api-key") || "";
+    setGeminiApiKey(cachedGeminiApiKey);
     setPrompt(
       cachedPrompt ||
         `Role: Query Understanding
@@ -88,8 +85,6 @@ Rules:
 - normalizedBrand: Brand name in UPPERCASE ENGLISH (e.g., 東芝->TOSHIBA, シャープ->SHARP, ナショナル->NATIONAL). If you output brand, you MUST output normalizedBrand. Only leave both empty when the query truly has no brand.
 - detailedCategory: COARSE product type only (no variants/attributes). UPPERCASE ENGLISH CONSTANT, 1-2 tokens with underscore. Examples (short): COFFEE_MAKER, LAPTOP, SMARTPHONE, CAMERA, LENS, TV, WASHING_MACHINE, MICROWAVE, RICE_COOKER, AIR_CONDITIONER, VACUUM, ROBOT_VACUUM, REFRIGERATOR. Do NOT add qualifiers like ESPRESSO/MULTI-FUNCTION/MANUAL. Always pick the base type only. Use the most common everyday term; avoid niche synonyms (e.g., prefer RECORD_PLAYER over TURNTABLE).`,
     );
-    const apiKey = localStorage.getItem("ai-studio-gemini-api-key");
-    setGeminiApiKey(apiKey || "");
     const cachedSchema = localStorage.getItem(OUTPUT_SCHEMA_STORAGE_KEY);
     if (cachedSchema) {
       setOutputSchemaText(cachedSchema);
@@ -125,29 +120,6 @@ Rules:
             <h1 className="text-3xl font-bold tracking-tight">
               Product Search AI Studio
             </h1>
-            <p className="text-sm text-muted-foreground">For testing prompt</p>
-            <div className="flex justify-center items-center gap-4">
-              <div>
-                <Link
-                  className="justify-self-start text-blue-700 underline"
-                  href={"/"}
-                >
-                  Home
-                </Link>
-              </div>
-              <div className="flex-1 flex items-center gap-2">
-                <label htmlFor="gemini-api-key" className="text-sm">
-                  Gemini API Key
-                </label>
-                <input
-                  type="text"
-                  name="gemini-api-key"
-                  value={geminiApiKey}
-                  className="flex-1 px-2 py-1 border rounded-md"
-                  onChange={(e) => handleSetGeminiApiKey(e.target.value)}
-                />
-              </div>
-            </div>
           </div>
         </div>
       </div>

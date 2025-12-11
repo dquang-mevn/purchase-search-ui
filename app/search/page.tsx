@@ -4,16 +4,15 @@ import { useState } from "react";
 
 import { SearchResults } from "@/components/search-results";
 import { useSearchApi } from "@/hooks/use-search";
-import { SearchForm2 } from "@/components/search-form-2";
 import { ProductRecord } from "@/common/search-api.types";
+import { SearchForm3 } from "@/components/search-form-3";
 
-export default function Home() {
+export default function Search() {
   const [results, setResults] = useState<ProductRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchTime, setSearchTime] = useState<number>();
-  const {
-    search,
-  } = useSearchApi();
+
+  const { search } = useSearchApi();
 
   // State for SearchForm2 values (to allow test case fill)
   const [formQuery, setFormQuery] = useState<string>("");
@@ -50,8 +49,11 @@ export default function Home() {
         <div className="container mx-auto px-6 py-4">
           <div className="text-center space-y-1">
             <h1 className="text-3xl font-bold tracking-tight">
-              Product Search
+              Product Search Demo
             </h1>
+            <p className="text-sm text-muted-foreground">
+              Dynamically search through product data with multiple parameters
+            </p>
           </div>
         </div>
       </div>
@@ -60,7 +62,7 @@ export default function Home() {
       <div className="flex h-[calc(100vh-120px)]">
         {/* Left Panel - Search Form */}
         <div className="w-1/4 border-r bg-muted/30 p-6 overflow-y-auto">
-          <SearchForm2
+          <SearchForm3
             onSearch={handleSearch}
             isLoading={isLoading}
             // Controlled props for test case fill

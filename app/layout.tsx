@@ -1,6 +1,8 @@
-import type { Metadata } from "next";
+"use client"
+
 import { Noto_Sans_JP, Noto_Sans_Mono } from "next/font/google";
 import "./globals.css";
+import { FloatingHeader } from "@/components/floating-header";
 
 const notoSansJP = Noto_Sans_JP({
   variable: "--font-noto-sans-jp",
@@ -12,11 +14,6 @@ const notoSansMono = Noto_Sans_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "Purchase Search UI",
-  description: "Purchase Search UI by Chameleon Team",
-};
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -27,7 +24,10 @@ export default function RootLayout({
       <body
         className={`${notoSansJP.variable} ${notoSansMono.variable} antialiased`}
       >
-        {children}
+        <FloatingHeader/>
+        <main>
+          {children}
+        </main>
       </body>
     </html>
   );

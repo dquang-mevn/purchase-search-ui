@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import {
   Select,
@@ -24,15 +23,8 @@ export interface SearchParam {
 }
 
 interface SearchFormProps {
-  /**
-   * Callback function that receives the generated query string.
-   * Based on the README, the component's job is to build the query string,
-   * which the parent can then use in an API request.
-   */
   onSearch: (queryString: string) => void;
   isLoading?: boolean;
-
-  // Controlled props for test case fill (all optional)
   query?: string;
   setQuery?: (v: string) => void;
   searchType?: string;
@@ -49,12 +41,13 @@ interface SearchFormProps {
   setLimit?: (v: string) => void;
 }
 
-/**
- * Updated FIELD_OPTIONS based on the "Example Item JSON" in README.md
- * and the fields used in TEST_CASES.md.
- */
 const FIELD_OPTIONS = [
-  { value: "title", label: "Title", type: "string", defaultOperator: "icontains" },
+  {
+    value: "title",
+    label: "Title",
+    type: "string",
+    defaultOperator: "icontains",
+  },
   {
     value: "category",
     label: "Category",
@@ -105,7 +98,6 @@ const FIELD_OPTIONS = [
     type: "number",
     defaultOperator: "none",
   },
-
   {
     value: "temp_profit_amount",
     label: "Profit",
@@ -169,15 +161,8 @@ const FIELD_OPTIONS = [
   },
 ];
 
-/**
- * Updated OPERATOR_OPTIONS based on "Suffix-Based Filters" in README.md.
- * Removed "equals" (ambiguous), "fuzzy", and "wildcard" (not in README).
- */
 const OPERATOR_OPTIONS = [
-  // Default
   { value: "none", label: "Default", for: "all" },
-
-  // String operations
   { value: "exact_match", label: "Exact Match (=)", for: "string" },
   {
     value: "case_insensitive",
@@ -197,25 +182,40 @@ const OPERATOR_OPTIONS = [
   { value: "not_contains", label: "Not Contains (!*text*)", for: "string" },
   { value: "starts_with", label: "Starts With (text*)", for: "string" },
   { value: "ends_with", label: "Ends With (*text)", for: "string" },
-
-  // Numeric operations
   { value: "greater_than", label: "Greater Than (>)", for: "number" },
   { value: "less_than", label: "Less Than (<)", for: "number" },
   { value: "greater_equal", label: "Greater or Equal (≥)", for: "number" },
   { value: "less_equal", label: "Less or Equal (≤)", for: "number" },
   { value: "between", label: "Between (range)", for: "number" },
   { value: "not_between", label: "Not Between", for: "number" },
-
-  // Array/List operations
   { value: "in", label: "In List (e.g., a,b,c)", for: "list" },
   { value: "not_in", label: "Not In List (e.g., a,b,c)", for: "list" },
-
-  // Null/Empty operations
   { value: "is_null", label: "Is Null/Empty", for: "all" },
   { value: "is_not_null", label: "Is Not Null/Empty", for: "all" },
 ];
 
-export function SearchForm2({
+// --- 1. REVERSE MAP FOR PARSING ---
+const SUFFIX_TO_OPERATOR: Record<string, string> = {
+  __contains: "contains",
+  __icontains: "icontains",
+  __not_contains: "not_contains",
+  __startswith: "starts_with",
+  __endswith: "ends_with",
+  __exact: "exact_match",
+  __iexact: "case_insensitive",
+  __gt: "greater_than",
+  __lt: "less_than",
+  __gte: "greater_equal",
+  __lte: "less_equal",
+  __range: "between",
+  __not_range: "not_between",
+  __in: "in",
+  __notin: "not_in",
+  __isnull: "is_null",
+  __isnotnull: "is_not_null",
+};
+
+export function SearchForm3({
   onSearch,
   isLoading = false,
   query: controlledQuery,
@@ -232,10 +232,13 @@ export function SearchForm2({
   setLimit: setControlledLimit,
 }: SearchFormProps) {
   const LOCAL_STORAGE_KEY = "searchForm2State";
-
   const { searchEndpoint } = useSearchApi();
+  const { params: paramsFromUrl } = useSearchParams(); // Removed setSearchParamsToUrl as we usually don't want to double-set on load
+
+  // Ref to prevent double firing in React strict mode or rapid re-renders
+  const hasInitializedFromUrl = useRef(false);
+
   // --- STATE ---
-  // If controlled prop is provided, use it; otherwise use internal state
   const [uncontrolledQuery, setUncontrolledQuery] = useState<string>("");
   const [uncontrolledSearchType, setUncontrolledSearchType] =
     useState<string>("semantic");
@@ -294,9 +297,97 @@ export function SearchForm2({
       ? setControlledLimit
       : setUncontrolledLimit;
 
-  // Only persist if using uncontrolled state
+  // --- 2. NEW EFFECT: PARSE URL AND TRIGGER SEARCH ---
+  useEffect(() => {
+    // Only run if we are in browser and haven't initialized yet
+    if (typeof window === "undefined" || hasInitializedFromUrl.current) return;
+
+    // Use paramsFromUrl (string) to check presence
+    if (paramsFromUrl && paramsFromUrl.length > 1) {
+      // length > 1 to ignore empty "?"
+      hasInitializedFromUrl.current = true;
+
+      const urlParams = new URLSearchParams(paramsFromUrl);
+      const newSearchParams: SearchParam[] = [];
+
+      // A. Parse Standard Params
+      if (urlParams.has("query")) setQuery(urlParams.get("query") || "");
+      if (urlParams.has("limit")) setLimit(urlParams.get("limit") || "10");
+
+      // B. Parse Sort Param (sortBy_field=order)
+      let foundSort = false;
+      urlParams.forEach((value, key) => {
+        if (key.startsWith("sortBy_")) {
+          setSortBy(key.replace("sortBy_", ""));
+          setSortOrder(value);
+          foundSort = true;
+        }
+      });
+      if (!foundSort) setSortBy(""); // Reset if not found
+
+      // C. Parse Filter Params
+      urlParams.forEach((value, key) => {
+        // Skip reserved keys
+        if (key === "query" || key === "limit" || key.startsWith("sortBy_"))
+          return;
+
+        // Determine Field and Operator
+        // Logic: Split by "__". The last part is the suffix if it matches our list.
+        // If no "__" or suffix doesn't match, assume default operator or 'none'.
+
+        let field = key;
+        let operator = "none";
+
+        // Try to find a known suffix at the end of the key
+        const parts = key.split("__");
+        if (parts.length > 1) {
+          const possibleSuffix = "__" + parts[parts.length - 1];
+          if (SUFFIX_TO_OPERATOR[possibleSuffix]) {
+            operator = SUFFIX_TO_OPERATOR[possibleSuffix];
+            // Rejoin the rest as the field name (handle cases where field has __ inside, though rare)
+            field = parts.slice(0, -1).join("__");
+          }
+        }
+
+        newSearchParams.push({
+          id: Math.random().toString(36).substr(2, 9),
+          field,
+          operator,
+          value:
+            operator === "is_null" || operator === "is_not_null" ? "" : value, // Value is ignored for null checks
+        });
+      });
+
+      if (newSearchParams.length > 0) {
+        setSearchParams(newSearchParams);
+      } else {
+        // Reset to empty default if only query string was present
+        setSearchParams([{ id: "1", field: "", operator: "", value: "" }]);
+      }
+
+      // D. Trigger Search Immediately
+      const cleanQuery = paramsFromUrl.replace(/^\?/, ""); // Remove leading ?
+      setQueryString(cleanQuery);
+      onSearch(cleanQuery);
+    }
+  }, [
+    paramsFromUrl,
+    setQuery,
+    setLimit,
+    setSortBy,
+    setSortOrder,
+    setSearchParams,
+    onSearch,
+  ]);
+
+  // --- 3. UPDATED EFFECT: LOAD FROM LOCAL STORAGE ---
   useEffect(() => {
     if (typeof window === "undefined") return;
+
+    // PRIORITY CHECK: If URL params exist, DO NOT load from local storage.
+    // The URL effect above will handle state initialization.
+    if (paramsFromUrl && paramsFromUrl.length > 1) return;
+
     if (
       controlledQuery !== undefined ||
       controlledSearchType !== undefined ||
@@ -306,7 +397,6 @@ export function SearchForm2({
       controlledSortOrder !== undefined ||
       controlledLimit !== undefined
     ) {
-      // Don't persist if controlled
       return;
     }
     try {
@@ -329,11 +419,11 @@ export function SearchForm2({
         if (parsed.limit !== undefined) setUncontrolledLimit(parsed.limit);
       }
     } catch (e) {
-      // Ignore parse errors
       console.error("Failed to load saved search form state:", e);
     }
-  }, []);
+  }, [paramsFromUrl]); // Added paramsFromUrl dependency
 
+  // ... [Existing LocalStorage SAVE effect remains the same] ...
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (
@@ -345,7 +435,6 @@ export function SearchForm2({
       controlledSortOrder !== undefined ||
       controlledLimit !== undefined
     ) {
-      // Don't persist if controlled
       return;
     }
     const state = {
@@ -378,7 +467,9 @@ export function SearchForm2({
     controlledSortOrder,
     controlledLimit,
   ]);
-  // --- PARAM HANDLERS ---
+
+  // ... [Rest of the component (Handlers, JSX) remains exactly the same] ...
+
   const addSearchParam = () => {
     const newParam: SearchParam = {
       id: Date.now().toString(),
@@ -393,7 +484,6 @@ export function SearchForm2({
     if (searchParams.length > 1) {
       setSearchParams(searchParams.filter((param) => param.id !== id));
     } else {
-      // If it's the last one, just clear it
       setSearchParams([{ id: "1", field: "", operator: "", value: "" }]);
     }
   };
@@ -406,15 +496,8 @@ export function SearchForm2({
     );
   };
 
-  // --- QUERY STRING GENERATION ---
-
-  /**
-   * Suffix map remains mostly the same, just removed operators
-   * not present in the README.
-   */
   const getOperatorSuffix = (operator: string): string => {
     const suffixMap: Record<string, string> = {
-      // String operations
       contains: "__contains",
       icontains: "__icontains",
       not_contains: "__not_contains",
@@ -422,47 +505,30 @@ export function SearchForm2({
       ends_with: "__endswith",
       exact_match: "__exact",
       case_insensitive: "__iexact",
-
-      // Numeric operations
       greater_than: "__gt",
       less_than: "__lt",
       greater_equal: "__gte",
       less_equal: "__lte",
       between: "__range",
       not_between: "__not_range",
-
-      // Array/List operations
       in: "__in",
       not_in: "__notin",
-
-      // Null/Empty operations
       is_null: "__isnull",
       is_not_null: "__isnotnull",
-
-      // Regular expressions
       regex: "__regex",
       not_regex: "__not_regex",
-
-      // Semantic search
       semantic: "__semantic",
     };
-
-    return suffixMap[operator] || ""; // Default to exact match if unset
+    return suffixMap[operator] || "";
   };
 
-  /**
-   * Rewritten to handle reserved parameters (type, query, etc.)
-   * and the correct sorting format (?sortBy_<field>=<order>).
-   */
   const generateQueryString = (): string => {
     const queryParams = new URLSearchParams();
 
-    // 1. Add reserved parameters from README
     if (query) {
       queryParams.append("query", query);
     }
 
-    // 2. Add Suffix-Based Filters
     const validParams = searchParams.filter(
       (param) =>
         param.field &&
@@ -473,36 +539,26 @@ export function SearchForm2({
     validParams.forEach((param) => {
       const suffix = getOperatorSuffix(param.operator);
       const paramName = `${param.field}${suffix}`;
-
       let paramValue = param.value;
-      if (param.operator === "is_null") {
+      if (param.operator === "is_null" || param.operator === "is_not_null") {
         paramValue = "true";
-      } else if (param.operator === "is_not_null") {
-        paramValue = "true"; // isnotnull also takes 'true'
       }
 
-      // Don't add value for null/notnull if it wasn't set (it's 'true' now)
       if (param.operator === "is_null" || param.operator === "is_not_null") {
         queryParams.append(paramName, paramValue);
       } else if (param.value) {
-        // Only append if value is not empty
         queryParams.append(paramName, paramValue);
       }
     });
 
-    // 3. Add Sorting (New format: sortBy_<field>=<order>)
     if (sortBy && sortBy !== "none") {
       const sortParamName = `sortBy_${sortBy}`;
       queryParams.append(sortParamName, sortOrder);
     }
 
-    // 4. Add Pagination
     if (limit && limit !== "10" && !isNaN(Number(limit)) && Number(limit) > 0) {
       queryParams.append("limit", limit);
     }
-
-    // 'from' parameter is not included as it's usually handled
-    // by a separate pagination state/component, not the search form.
 
     return queryParams.toString();
   };
@@ -510,24 +566,16 @@ export function SearchForm2({
   const handleSearch = () => {
     const generatedQueryString = generateQueryString();
     setQueryString(generatedQueryString);
-
-    onSearch(generatedQueryString); // Pass the final string to the parent
+    onSearch(generatedQueryString);
   };
 
-  /**
-   * Helper function for clipboard copy to avoid iFrame issues
-   * with navigator.clipboard.
-   */
   const copyToClipboard = (text: string) => {
     if (navigator.clipboard && window.isSecureContext) {
-      // Use modern clipboard API if available and in secure context
       navigator.clipboard.writeText(text).catch((err) => {
-        // Fallback if it fails (e.g., iFrame restrictions)
         console.warn("Clipboard API failed, falling back to execCommand.", err);
         fallbackCopyToClipboard(text);
       });
     } else {
-      // Fallback for http or sandboxed iframes
       fallbackCopyToClipboard(text);
     }
   };
@@ -536,8 +584,6 @@ export function SearchForm2({
     try {
       const textArea = document.createElement("textarea");
       textArea.value = text;
-
-      // Avoid scrolling to bottom
       textArea.style.position = "fixed";
       textArea.style.top = "0";
       textArea.style.left = "0";
@@ -548,11 +594,9 @@ export function SearchForm2({
       textArea.style.outline = "none";
       textArea.style.boxShadow = "none";
       textArea.style.background = "transparent";
-
       document.body.appendChild(textArea);
       textArea.focus();
       textArea.select();
-
       document.execCommand("copy");
       document.body.removeChild(textArea);
     } catch (e) {
@@ -562,7 +606,6 @@ export function SearchForm2({
 
   const canAddMore = searchParams.length < 10;
 
-  // --- JSX (UI) ---
   return (
     <Card
       className="w-full max-w-2xl mx-auto"
@@ -572,7 +615,6 @@ export function SearchForm2({
         <CardTitle className="text-lg">Search Configuration</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* --- NEW Main Query & Type Section --- */}
         <div className="space-y-4 p-3 border rounded-lg">
           <h4 className="text-sm font-medium text-gray-700">Main Search</h4>
           <Input
@@ -583,7 +625,6 @@ export function SearchForm2({
           />
         </div>
 
-        {/* --- Dynamic Filter Parameters --- */}
         <h4 className="text-sm font-medium text-gray-700 pt-2">Filters</h4>
         {searchParams.map((param, index) => (
           <div key={param.id} className="p-3 border rounded-lg bg-gray-50">
@@ -678,10 +719,8 @@ export function SearchForm2({
           Add Filter
         </Button>
 
-        {/* --- Sort and Limit Section --- */}
         <div className="border-t pt-4 space-y-4">
           <h4 className="text-sm font-medium text-gray-700">Sort & Limit</h4>
-
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             <Select value={sortBy} onValueChange={setSortBy}>
               <SelectTrigger className="h-9 w-full">
@@ -717,7 +756,7 @@ export function SearchForm2({
               placeholder="Limit (default: 10)"
               className="h-9"
               min="1"
-              max="50" // Capped at 50 as per README
+              max="50"
             />
           </div>
         </div>

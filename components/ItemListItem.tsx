@@ -93,9 +93,9 @@ const ItemListItem: React.FC<ItemListItemProps> = ({
         <div className="flex p-4 gap-4">
           {/* Image Block - Left Side */}
           <div className="shrink-0">
-            <img
-              width="148"
-              height="148"
+            <Image
+              width="150"
+              height="150"
               src={imageUrl || "https://placehold.co/148x148"}
               alt={altText}
               className="w-[148px] h-[148px] object-contain"
@@ -124,7 +124,7 @@ const ItemListItem: React.FC<ItemListItemProps> = ({
 
             {/* Date and Location */}
             <p className="text-xs text-gray-600">
-              <span>{formattedDate}</span>  
+              <span>{formattedDate}</span>
               <span className="hidden md:inline">&nbsp;</span>
               <br className="md:hidden" />
               <span>{offer_info?.pref}で買取</span>

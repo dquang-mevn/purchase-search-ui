@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from "react";
 
 export function useSearchApi() {
@@ -7,7 +9,6 @@ export function useSearchApi() {
     }
     return "";
   });
-  const [healthStatus, setHealthStatus] = useState<string>("");
 
   const handleSaveSearchEndpoint = () => {
     if (typeof window !== "undefined") {
@@ -23,19 +24,12 @@ export function useSearchApi() {
       }
       const data = await response.json();
       console.log("Health check successful:", data);
-      setHealthStatus("OK");
       return true;
     } catch (error) {
       console.error("Health check error:", error);
-      setHealthStatus("Failed");
       return false;
     }
   };
-
-  type SearchParams = Record<
-    string,
-    string | number | boolean | undefined | null
-  >;
 
   const search = async (query: string): Promise<any> => {
     const response = await fetch(`${searchEndpoint}/search?${query}`, {
@@ -53,7 +47,6 @@ export function useSearchApi() {
 
   return {
     searchEndpoint,
-    healthStatus,
     setSearchEndpoint,
     handleSaveSearchEndpoint,
     checkHealth,
